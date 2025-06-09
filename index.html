@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Chat Interface</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        /* Custom scrollbar */
+        .chat-container::-webkit-scrollbar {
+            width: 6px;
+        }
+        .chat-container::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 10px;
+        }
+        .chat-container::-webkit-scrollbar-thumb {
+            background: #cbd5e0;
+            border-radius: 10px;
+        }
+        .chat-container::-webkit-scrollbar-thumb:hover {
+            background: #a0aec0;
+        }
+        
+        /* Typing indicator animation */
+        @keyframes pulse {
+            0%, 100% {
+                opacity: 0.5;
+            }
+            50% {
+                opacity: 1;
+            }
+        }
+        .typing-dot {
+            animation: pulse 1.5s infinite ease-in-out;
+        }
+        .typing-dot:nth-child(1) {
+            animation-delay: 0s;
+        }
+        .typing-dot:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+        .typing-dot:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+        
+        /* Smooth message appearance */
+        .message {
+            opacity: 0;
+            transform: translateY(10px);
+            animation: fadeIn 0.3s forwards;
+        }
+        @keyframes fadeIn {
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen flex flex-col">
+    <div class="max-w-4xl mx-auto w-full flex-1 flex flex-col p-4">
+        <!-- Header -->
+        <header class="bg-white rounded-lg shadow-sm p-4 mb-4">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 rounded-full bg-indigo-500 flex items-center justify-center">
+                        <i class="fas fa-robot text-white text-xl"></i>
+                    </div>
+                    <h1 class="text-xl font-bold text-gray-800">AI Chat Assistant</h1>
+                </div>
+                <div id="connection-status" class="flex items-center">
+                    <span class="w-3 h-3 rounded-full bg-red-500 mr-2"></span>
+                    <span class="text-sm text-gray-600">Disconnected</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Connection Panel -->
+        <div id="connection-panel" class="bg-white rounded-lg shadow-sm p-6 mb-4 transition-all duration-300">
+            <h2 class="text-lg font-semibold text-gray-800 mb-4">Connect to AI</h2>
+            <div class="space-y-4">
+                <div>
+                    <label for="api-key" class="block text-sm font-medium text-gray-700 mb-1">API Key</label>
+                    <div class="relative">
+                        <input type="password" id="api-key" 
+                               class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition"
+                               placeholder="Enter your API key" 
+                               value="sk-9cd87d52258141b0bcd697a19d4a0c98">
+                        <button id="toggle-key" class="absolute right-3 top-2.5 text-gray-500">
+                            <i class="far fa-eye"></i>
+                        </button>
+                    </div>
+                </div>
+                
+                <input type="hidden" id="model" value="deepseek">
+                
+                <div class="pt-2">
+                    <button id="connect-btn" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2.5 px-4 rounded-lg transition duration-200 flex items-center justify-center">
+                        <i class="fas fa-plug mr-2"></i> Connect
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Chat Area (initially hidden) -->
+        <div id="chat-container" class="hidden bg-white rounded-lg shadow-sm flex-1 flex flex-col min-h-[400px] max-h-[70vh] overflow-hidden">
+            <div class="chat-container overflow-y-auto flex-1 p-4 space-y-4" id="chat-messages">
+                <!-- Welcome message -->
+                <div class="message flex justify-start">
+                    <div class="max-w-[80%]">
+                        <div class="flex items-end space-x-2">
+                            <div class="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center">
+                                <i class="fas fa-robot text-indigo-600 text-sm"></i>
+                            </div>
+                            <div class="bg-indigo-50 text-gray-800 rounded-lg rounded-bl-none px-4 py-3">
+                                <p>Hello! I'm your AI assistant. How can I help you today?</p>
+                            </div>
+                        </div>
+                        <p class="text-xs text-gray-500 mt-1 pl-10">Just now</p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Input Area -->
+            <div class="border-t border-gray-200 p-3 bg-gray-50">
+                <form id="message-form" class="flex space-x-2">
+                    <div class="flex-1 relative">
+                        <input type="text" id="message-input" 
+                               class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition pr-12"
+                               placeholder="Type your message..." autocomplete="off">
+                        <div class="absolute right-3 top-3.5 flex space-x-1">
+                            <button type="button" class="text-gray 400 hover:text-indigo-600 transition">
+                                <i class="far fa-smile"></i>
+                            </button>
+                            <button type="button" class="text-gray-400 hover:text-indigo-600 transition">
+                                <i class="fas fa-paperclip"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white w-12 h-12 rounded-lg flex items-center justify-center transition">
+                        <i class="fas fa-paper-plane"></i>
+                    </button>
+                </form>
+                
+                <div class="flex justify-between items-center mt-2 px-1">
+                    <p class="text-xs text-gray-500">AI Assistant is powered by advanced language models</p>
+                    <button id="disconnect-btn" class="text-xs text-red-500 hover:text-red-700 transition flex items-center">
+                        <i class="fas fa-sign-out-alt mr-1"></i> Disconnect
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // DOM Elements
+            const connectionPanel = document.getElementById('connection-panel');
+            const chatContainer = document.getElementById('chat-container');
+            const connectBtn = document.getElementById('connect-btn');
+            const disconnectBtn = document.getElementById('disconnect-btn');
+            const toggleKeyBtn = document.getElementById('toggle-key');
+            const apiKeyInput = document.getElementById('api-key');
+            const temperatureInput = document.getElementById('temperature');
+            const tempValue = document.getElementById('temp-value');
+            const messageForm = document.getElementById('message-form');
+            const messageInput = document.getElementById('message-input');
+            const chatMessages = document.getElementById('chat-messages');
+            const connectionStatus = document.getElementById('connection-status');
+            
+            // Toggle API key visibility
+            toggleKeyBtn.addEventListener('click', function() {
+                const type = apiKeyInput.getAttribute('type') === 'password' ? 'text' : 'password';
+                apiKeyInput.setAttribute('type', type);
+                toggleKeyBtn.innerHTML = type === 'password' ? '<i class="far fa-eye"></i>' : '<i class="far fa-eye-slash"></i>';
+            });
+            
+            // Connect to chat
+            connectBtn.addEventListener('click', async function() {
+                const apiKey = apiKeyInput.value.trim();
+                if (!apiKey) {
+                    alert('Please enter your API key');
+                    return;
+                }
+
+                connectBtn.innerHTML = '<i class="fas fa-spinner animate-spin mr-2"></i> Connecting...';
+                connectBtn.disabled = true;
+
+                try {
+                    // Test the API connection by making a simple request
+                    const testResponse = await fetch('https://api.deepseek.com/v1/chat/completions', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${apiKey}`
+                        },
+                        body: JSON.stringify({
+                            model: 'deepseek-chat',
+                            messages: [
+                                {
+                                    role: 'user',
+                                    content: 'Hello'
+                                }
+                            ],
+                            temperature: 0.7,
+                            max_tokens: 50
+                        })
+                    });
+
+                    if (!testResponse.ok) {
+                        throw new Error('API connection failed');
+                    }
+
+                    // Successfully connected
+                    connectionPanel.classList.add('opacity-0', 'h-0', 'overflow-hidden', 'mb-0');
+                    chatContainer.classList.remove('hidden');
+                    
+                    connectionStatus.innerHTML = `
+                        <span class="w-3 h-3 rounded-full bg-green-500 mr-2"></span>
+                        <span class="text-sm text-gray-600">Connected (Deepseek)</span>
+                    `;
+                    
+                    // Add welcome message from AI
+                    addMessage("Hello! I'm your Deepseek AI assistant. How can I help you today?", 'ai');
+                    
+                } catch (error) {
+                    alert('Connection failed: ' + error.message);
+                } finally {
+                    connectBtn.innerHTML = '<i class="fas fa-plug mr-2"></i> Connect';
+                    connectBtn.disabled = false;
+                }
+            });
+            
+            // Disconnect from chat
+            disconnectBtn.addEventListener('click', function() {
+                // Reset UI
+                connectionPanel.classList.remove('opacity-0', 'h-0', 'overflow-hidden', 'mb-0');
+                chatContainer.classList.add('hidden');
+                chatMessages.innerHTML = ''; // Clear messages
+                
+                // Reset status
+                connectionStatus.innerHTML = `
+                    <span class="w-3 h-3 rounded-full bg-red-500 mr-2"></span>
+                    <span class="text-sm text-gray-600">Disconnected</span>
+                `;
+                
+                // Re-add welcome message
+                addMessage("Hello! I'm your AI assistant. How can I help you today?", 'ai');
+            });
+            
+            // Send message
+            messageForm.addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                const message = messageInput.value.trim();
+                if (!message) return;
+                
+                // Add user message to chat
+                addMessage(message, 'user');
+                messageInput.value = '';
+                
+                // Show AI is typing
+                const typingId = showTypingIndicator();
+                
+                // Simulate AI response after delay
+                setTimeout(function() {
+                    // Remove typing indicator
+                    const typingElement = document.getElementById(typingId);
+                    if (typingElement) typingElement.remove();
+                    
+                    // Add AI response
+                    const responses = [
+                        "I'm an AI assistant designed to help answer questions and engage in conversation. What would you like to know more about?",
+                        "Interesting point! From what I understand, you're asking about how AI systems work. Would you like me to elaborate?",
+                        "Thanks for sharing that thought. I can help analyze, summarize, or expand on any topic you'd like to discuss.",
+                        "That's a great question! As an AI, my knowledge is current until my training cutoff date. Let me know how I can assist you further.",
+                        "I'm processing your message... Here's what I understand so far. Would you like me to provide more details on any particular aspect?"
+                    ];
+                    
+                    const randomResponse = responses[Math.floor(Math.random() * responses.length)];
+                    addMessage(randomResponse, 'ai');
+                    
+                    // Scroll to bottom
+                    chatMessages.scrollTop = chatMessages.scrollHeight;
+                }, 2000 + Math.random() * 2000); // Random delay between 2-4 seconds
+            });
+            
+            // Helper function to add message to chat
+            function addMessage(message, sender) {
+                const timestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                
+                const messageDiv = document.createElement('div');
+                messageDiv.className = 'message flex';
+                
+                if (sender === 'user') {
+                    messageDiv.classList.add('justify-end');
+                    messageDiv.innerHTML = `
+                        <div class="max-w-[80%]">
+                            <div class="flex items-end space-x-2 justify-end">
+                                <div class="bg-indigo-600 text-white rounded-lg rounded-br-none px-4 py-3">
+                                    <p>${message}</p>
+                                </div>
+                                <div class="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center">
+                                    <i class="fas fa-user text-white text-sm"></i>
+                                </div>
+                            </div>
+                            <p class="text-xs text-gray-500 mt-1 text-right pr-10">${timestamp}</p>
+                        </div>
+                    `;
+                } else {
+                    messageDiv.classList.add('justify-start');
+                    messageDiv.innerHTML = `
+                        <div class="max-w-[80%]">
+                            <div class="flex items-end space-x-2">
+                                <div class="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center">
+                                    <i class="fas fa-robot text-indigo-600 text-sm"></i>
+                                </div>
+                                <div class="bg-indigo-50 text-gray-800 rounded-lg rounded-bl-none px-4 py-3">
+                                    <p>${message}</p>
+                                </div>
+                            </div>
+                            <p class="text-xs text-gray-500 mt-1 pl-10">${timestamp}</p>
+                        </div>
+                    `;
+                }
+                
+                chatMessages.appendChild(messageDiv);
+                
+                // Scroll to bottom
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+            }
+            
+            // Helper function to show typing indicator
+            function showTypingIndicator() {
+                const typingId = 'typing-' + Date.now();
+                
+                const typingDiv = document.createElement('div');
+                typingDiv.className = 'message flex justify-start';
+                typingDiv.id = typingId;
+                
+                typingDiv.innerHTML = `
+                    <div class="max-w-[80%]">
+                        <div class="flex items-end space-x-2">
+                            <div class="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center">
+                                <i class="fas fa-robot text-indigo-600 text-sm"></i>
+                            </div>
+                            <div class="bg-indigo-50 text-gray-800 rounded-lg rounded-bl-none px-4 py-3">
+                                <div class="flex space-x-1 px-4">
+                                    <div class="typing-dot w-2 h-2 rounded-full bg-gray-500"></div>
+                                    <div class="typing-dot w-2 h-2 rounded-full bg-gray-500"></div>
+                                    <div class="typing-dot w-2 h-2 rounded-full bg-gray-500"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                
+                chatMessages.appendChild(typingDiv);
+                
+                // Scroll to bottom
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+                
+                return typingId;
+            }
+            
+            // Handle Enter key with Shift for new lines
+            messageInput.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    messageForm.dispatchEvent(new Event('submit'));
+                }
+            });
+        });
+    </script>
+</body>
+</html>
